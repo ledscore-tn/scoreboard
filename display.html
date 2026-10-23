@@ -32,7 +32,7 @@
 
   #mid { left: 222px; top: 0; width: 116px; height: 80px; }
   #period { position: absolute; left: 0; right: 0; top: 3px; height: 16px; line-height: 16px; font-size: 12px;
-            text-align: center; color: #9fe8ff; letter-spacing: 1px; white-space: nowrap; overflow: hidden; }
+            text-align: center; color: #9fe8ff; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; }
   #clock { position: absolute; left: 0; right: 0; top: 22px; height: 54px; line-height: 54px; text-align: center;
            color: #ffc400; font-size: 42px; white-space: nowrap; }
   #clock span { display: inline-block; width: 23px; text-align: center; }
@@ -161,7 +161,7 @@
       }
       renderFlag(s);
     }
-    var p = LS.PERIODS[state.period] !== undefined ? LS.PERIODS[state.period] : state.period;
+    var p = LS.periodText(state);
     if (last.period !== p) { last.period = p; txt($('period'), p); }
   }
 

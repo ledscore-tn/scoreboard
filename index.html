@@ -23,6 +23,9 @@
     background: var(--panel); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
   .pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); display: inline-block; }
   .pill.ok i { background: var(--go); } .pill.half i { background: var(--stop); }
+  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .lang button { min-height: 34px; border: 0; border-radius: 0; padding: 0 14px; background: var(--panel); }
+  .lang button.sel { background: var(--accent); color: #111; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
   .card h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 700; }
   .preview { padding: 10px; }
@@ -95,12 +98,15 @@
 <div class="wrap">
   <header>
     <h1>Rugby Scoreboard <small>control</small></h1>
-    <span class="pill" id="net"><i></i><span id="netText">Connecting…</span></span>
+    <div class="row" style="flex:0 0 auto;gap:8px">
+      <div class="lang" role="group" aria-label="Language"><button data-lang="en">EN</button><button data-lang="fr">FR</button></div>
+      <span class="pill" id="net"><i></i><span id="netText">Connecting…</span></span>
+    </div>
   </header>
 
   <section class="card preview">
     <div class="frame"><iframe id="preview" title="Live LED preview" tabindex="-1"></iframe></div>
-    <p>Live preview — this is exactly what the LED screen shows (received back from the server).</p>
+    <p id="hPrev">Live preview — this is exactly what the LED screen shows (received back from the server).</p>
   </section>
 
   <section class="card">
@@ -147,7 +153,7 @@
       <button data-half="7">7 (Sevens)</button>
       <input type="number" id="halfCustom" min="1" max="99" placeholder="Other" aria-label="Half length in minutes" style="flex:0 0 90px">
     </div>
-    <p class="hint">Half length decides when the clock turns <b style="color:var(--danger)">red</b> (40:00 in the 1st half, 80:00 in the 2nd) and where countdown starts.</p>
+    <p class="hint" id="hHalf">Half length decides when the clock turns <b style="color:var(--danger)">red</b> (40:00 in the 1st half, 80:00 in the 2nd) and where countdown starts.</p>
   </section>
 
   <section class="teams" id="teams"></section>
@@ -173,7 +179,7 @@
       <button data-msg="FULL TIME">FULL TIME</button>
       <button data-msg="WELCOME">WELCOME</button>
     </div>
-    <p class="hint">Covers the whole screen until you press Hide. Long text scrolls automatically.</p>
+    <p class="hint" id="hMsg">Covers the whole screen until you press Hide. Long text scrolls automatically.</p>
   </section>
 
   <section class="card">
@@ -183,12 +189,12 @@
       <button id="copyUrl">Copy link</button>
       <button id="openUrl">Open display</button>
     </div>
-    <p class="hint">Put this link in ViPlex as a <b>Web page</b> media, window size <b>560 × 80</b>. Match code: <b class="mono" id="codeShow"></b> — keep the same code for every match, so the link in the TB60 never has to change.</p>
+    <p class="hint" id="hLink">Put this link in ViPlex as a <b>Web page</b> media, window size <b>560 × 80</b>. Match code: <b class="mono" id="codeShow"></b> — keep the same code for every match, so the link in the TB60 never has to change.</p>
     <div class="row" style="margin-top:10px">
       <input type="text" id="codeInput" placeholder="Change match code" aria-label="Match code">
       <button id="codeBtn" style="flex:0 0 140px">Use this code</button>
     </div>
-    <p class="hint" id="wakeHint">Tip: keep this page open during the match. The screen stays awake on supported phones.</p>
+    <p class="hint" id="hWake">Tip: keep this page open during the match. The screen stays awake on supported phones.</p>
   </section>
 </div>
 
@@ -225,6 +231,52 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const now = () => Date.now();
 
+  // ---------- language (EN / FR) ----------
+  const FR = {
+    'control':'contrôle','Live LED preview':'Aperçu LED','Match clock':'Chronomètre','▶ Start':'▶ Démarrer','❚❚ Pause':'❚❚ Pause',
+    '−1 min':'−1 min','−1 s':'−1 s','+1 s':'+1 s','+1 min':'+1 min','Reset clock':'Remettre à zéro','Set time':'Régler',
+    'Period':'Période','1st half':'1re mi-temps','Half time':'Mi-temps','2nd half':'2e mi-temps','Full time':'Fin du match',
+    'Extra time':'Prolongations','No label':'Aucun','Clock settings':'Réglages du chrono','Count up':'Croissant','Count down':'Compte à rebours',
+    '40 min':'40 min','7 (Sevens)':'7 (à 7)','Other':'Autre','Left team':'Équipe gauche','Right team':'Équipe droite',
+    'Try':'Essai','Conversion':'Transformation','Penalty':'Pénalité','Drop goal':'Drop','Flag…':'Drapeau…','Remove':'Retirer',
+    'Team colour (side stripe)':'Couleur de l’équipe (bande)','Match tools':'Outils du match','↶ Undo last score':'↶ Annuler dernier point',
+    'Reset scores to 0–0':'Scores à 0–0','New match (scores + clock)':'Nouveau match (scores + chrono)','Full-screen message':'Message plein écran',
+    'Show':'Afficher','Hide':'Masquer','TRY!':'ESSAI !','HALF TIME':'MI-TEMPS','FULL TIME':'FIN DU MATCH','WELCOME':'BIENVENUE',
+    'LED screen link (TB60)':'Lien de l’écran LED (TB60)','Copy link':'Copier le lien','Open display':'Ouvrir l’affichage','Use this code':'Utiliser ce code',
+    'Change match code':'Changer le code du match','e.g. TRY!  or  WELCOME TO THE FINAL':'ex. ESSAI !  ou  BIENVENUE À LA FINALE',
+    'RUNNING':'EN COURS','PAUSED':'EN PAUSE','NO LABEL':'SANS TITRE','Online':'En ligne','Offline — reconnecting…':'Hors ligne — reconnexion…',
+    'Tap again to confirm':'Appuyer encore pour confirmer','Copied ✓':'Copié ✓','Nothing to undo':'Rien à annuler',
+    'Set 2nd half (restart countdown)':'2e mi-temps (relancer)','Set 2nd half':'2e mi-temps','Connecting…':'Connexion…'
+  };
+  const HINTS_FR = {
+    hPrev: 'Aperçu en direct — exactement ce que l’écran LED affiche (reçu du serveur).',
+    hHalf: 'La durée de la mi-temps décide quand le chrono devient <b style="color:var(--danger)">rouge</b> (40:00 en 1re mi-temps, 80:00 en 2e) et où démarre le compte à rebours.',
+    hMsg: 'Couvre tout l’écran jusqu’à « Masquer ». Un texte long défile automatiquement.',
+    hLink: 'Mettez ce lien dans ViPlex comme média <b>Page Web</b>, fenêtre <b>560 × 80</b>. Code du match : <b class="mono" id="codeShow"></b> — gardez le même code, le lien du TB60 ne change jamais.',
+    hWake: 'Astuce : gardez cette page ouverte pendant le match. L’écran reste allumé sur les téléphones compatibles.'
+  };
+  let uiLang = 'en';
+  const t = (en) => (uiLang === 'fr' && FR[en]) ? FR[en] : en;
+  function applyLang(l) {
+    uiLang = l === 'fr' ? 'fr' : 'en';
+    document.documentElement.lang = uiLang;
+    $$('button, h2, .sub, label.btn, small, .colorrow span, h1 small, #netText').forEach(el => {
+      if (el.querySelector('*:not(input)') && el.tagName !== 'LABEL') return;
+      const node = Array.from(el.childNodes).find(n => n.nodeType === 3 && n.nodeValue.trim());
+      if (!node) return;
+      if (el.dataset.en === undefined) el.dataset.en = node.nodeValue.trim();
+      node.nodeValue = t(el.dataset.en);
+    });
+    $$('input[placeholder]').forEach(el => { if (el.dataset.enp === undefined) el.dataset.enp = el.placeholder; el.placeholder = t(el.dataset.enp); });
+    Object.keys(HINTS_FR).forEach(id => {
+      const el = document.getElementById(id); if (!el) return;
+      if (el.dataset.enh === undefined) el.dataset.enh = el.innerHTML;
+      el.innerHTML = uiLang === 'fr' ? HINTS_FR[id] : el.dataset.enh;
+    });
+    const cs = document.getElementById('codeShow'); if (cs) cs.textContent = code;
+    $$('[data-lang]').forEach(b => b.classList.toggle('sel', b.dataset.lang === uiLang));
+  }
+
   // ---------- match code ----------
   let code = (LS.qs('code') || LS.store('ls_ctrl_code') || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
   if (!code) code = 'rugby-' + LS.rid(6);
@@ -248,7 +300,7 @@
   $('#codeShow').textContent = code;
   $('#preview').src = displayUrl;
   $('#copyUrl').onclick = async () => {
-    try { await navigator.clipboard.writeText(displayUrl); flashBtn($('#copyUrl'), 'Copied ✓'); }
+    try { await navigator.clipboard.writeText(displayUrl); flashBtn($('#copyUrl'), t('Copied ✓')); }
     catch (e) { prompt('Copy this link:', displayUrl); }
   };
   $('#openUrl').onclick = () => window.open(displayUrl, '_blank');
@@ -273,7 +325,7 @@
   }, (n, total) => {
     const p = $('#net');
     p.className = 'pill' + (n === total ? ' ok' : n > 0 ? ' half' : '');
-    $('#netText').textContent = n === total ? 'Online' : n > 0 ? `Online (${n}/${total} servers)` : 'Offline — reconnecting…';
+    $('#netText').textContent = n === total ? t('Online') : n > 0 ? `${t('Online')} (${n}/${total})` : t('Offline — reconnecting…');
   });
   // After (re)connecting, re-send what we have so the screen always gets the latest match.
   link.onConnect = (i) => setTimeout(() => {
@@ -375,7 +427,7 @@
     commit();
   }
   $('#undo').onclick = () => {
-    const h = history_.pop(); if (!h) return flashBtn($('#undo'), 'Nothing to undo');
+    const h = history_.pop(); if (!h) return flashBtn($('#undo'), t('Nothing to undo'));
     state.home.score = h.home; state.away.score = h.away; commit();
   };
   $('#resetScores').onclick = armed($('#resetScores'), () => {
@@ -424,15 +476,18 @@
     else { if (!text) return $('#msgText').focus(); state.msg = { on: true, text }; }
     commit();
   };
-  $$('[data-msg]').forEach(b => b.onclick = () => { $('#msgText').value = b.dataset.msg; state.msg = { on: true, text: b.dataset.msg }; commit(); });
+  $$('[data-msg]').forEach(b => b.onclick = () => { const m = t(b.dataset.msg); $('#msgText').value = m; state.msg = { on: true, text: m }; commit(); });
+  $$('[data-lang]').forEach(b => b.onclick = () => { state.lang = b.dataset.lang; applyLang(state.lang); commit(); });
 
   // two-tap confirm for destructive buttons
   function armed(btn, fn) {
-    let timer = null; const label = btn.textContent;
+    let timer = null;
+    if (btn.dataset.en === undefined) btn.dataset.en = btn.textContent.trim();
+    const restore = () => { btn.classList.remove('armed'); btn.textContent = t(btn.dataset.en); };
     return () => {
-      if (timer) { clearTimeout(timer); timer = null; btn.classList.remove('armed'); btn.textContent = label; fn(); return; }
-      btn.classList.add('armed'); btn.textContent = 'Tap again to confirm';
-      timer = setTimeout(() => { timer = null; btn.classList.remove('armed'); btn.textContent = label; }, 3000);
+      if (timer) { clearTimeout(timer); timer = null; restore(); fn(); return; }
+      btn.classList.add('armed'); btn.textContent = t('Tap again to confirm');
+      timer = setTimeout(() => { timer = null; restore(); }, 3000);
     };
   }
 
@@ -450,9 +505,10 @@
     let preset = false;
     $$('[data-half]').forEach(b => { const on = +b.dataset.half === state.halfMin; b.classList.toggle('sel', on); preset = preset || on; });
     if (!preset && document.activeElement !== $('#halfCustom')) $('#halfCustom').value = state.halfMin;
-    $('#secondHalf').textContent = state.clock.mode === 'down' ? 'Set 2nd half (restart countdown)' : `Set 2nd half (${state.halfMin}:00)`;
+    if ((state.lang || 'en') !== uiLang) applyLang(state.lang);
+    $('#secondHalf').textContent = state.clock.mode === 'down' ? t('Set 2nd half (restart countdown)') : `${t('Set 2nd half')} (${state.halfMin}:00)`;
     const mt = $('#msgToggle');
-    mt.textContent = state.msg.on ? 'Hide' : 'Show'; mt.classList.toggle('sel', state.msg.on);
+    mt.textContent = state.msg.on ? t('Hide') : t('Show'); mt.classList.toggle('sel', state.msg.on);
     if (state.msg.on && document.activeElement !== $('#msgText')) $('#msgText').value = state.msg.text;
     renderFlags(); tick();
   }
@@ -470,9 +526,9 @@
     const r = $('#readout');
     r.firstChild.nodeValue = LS.fmt(LS.shown(state));
     r.classList.toggle('alert', LS.alerting(state));
-    $('#readoutSub').textContent = (LS.PERIODS[state.period] || 'NO LABEL') + ' · ' + (c.running ? 'RUNNING' : 'PAUSED');
+    $('#readoutSub').textContent = (LS.periodText(state) || t('NO LABEL')) + ' · ' + t(c.running ? 'RUNNING' : 'PAUSED');
     const b = $('#startBtn');
-    b.textContent = c.running ? '❚❚ Pause' : '▶ Start';
+    b.textContent = t(c.running ? '❚❚ Pause' : '▶ Start');
     b.className = c.running ? 'stop' : 'go';
   }
   setInterval(tick, 200);
@@ -490,6 +546,8 @@
   document.addEventListener('click', wake);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
 
+  if (!state.lang) state.lang = 'en';
+  applyLang(state.lang);
   recalc(); render();
 })();
 </script>

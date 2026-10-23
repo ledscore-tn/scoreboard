@@ -39,11 +39,16 @@ var LS = (function () {
       away: { name: 'AWAY', color: '#e53935', score: 0 },
       clock: { running: false, ms: 0, sentAt: 0, mode: 'up', lengthMs: 2400000, alertMs: 2400000 },
       period: '1H', halfMin: 40,
-      msg: { on: false, text: '' }
+      msg: { on: false, text: '' }, lang: 'en'
     };
   }
 
   var PERIODS = { '1H': '1ST HALF', 'HT': 'HALF TIME', '2H': '2ND HALF', 'FT': 'FULL TIME', 'ET': 'EXTRA TIME', '': '' };
+  var PERIODS_FR = { '1H': '1RE MI-TEMPS', 'HT': 'MI-TEMPS', '2H': '2E MI-TEMPS', 'FT': 'FIN DU MATCH', 'ET': 'PROLONGATIONS', '': '' };
+  function periodText(state) {
+    var t = state.lang === 'fr' ? PERIODS_FR : PERIODS;
+    return t[state.period] !== undefined ? t[state.period] : state.period;
+  }
 
   // Clock offsets per sender: localNow - senderNow (learned from live messages).
   var offsets = {};
@@ -155,7 +160,7 @@ var LS = (function () {
   };
 
   return {
-    qs: qs, store: store, rid: rid, defaultState: defaultState, PERIODS: PERIODS,
+    qs: qs, store: store, rid: rid, defaultState: defaultState, PERIODS: PERIODS, PERIODS_FR: PERIODS_FR, periodText: periodText,
     elapsed: elapsed, shown: shown, alerting: alerting, fmt: fmt, Link: Link, offsets: offsets
   };
 })();
