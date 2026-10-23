@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Scoreboard Display</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #000; overflow: hidden; width: 100%; height: 100%; }
+  body { font-family: Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: bold; color: #fff;
+         -webkit-font-smoothing: antialiased; cursor: none; }
+  #board { position: absolute; left: 0; top: 0; width: 560px; height: 80px; background: #000; overflow: hidden;
+           -webkit-transform-origin: 0 0; transform-origin: 0 0; }
+  .abs { position: absolute; }
+
+  .team { top: 0; width: 140px; height: 80px; }
+  #homeTeam { left: 0; }
+  #awayTeam { left: 420px; }
+  .stripe { position: absolute; top: 0; width: 4px; height: 80px; }
+  #homeTeam .stripe { left: 0; }
+  #awayTeam .stripe { right: 0; }
+  .name { position: absolute; left: 8px; right: 8px; top: 2px; height: 28px; line-height: 28px; font-size: 22px;
+          text-align: center; white-space: nowrap; overflow: hidden; text-transform: uppercase; letter-spacing: 0.5px; }
+  .flag { position: absolute; left: 8px; right: 8px; top: 31px; height: 46px; text-align: center; line-height: 46px; }
+  .flag img { max-width: 76px; max-height: 46px; vertical-align: middle; }
+  .flag .noflag { display: inline-block; width: 64px; height: 40px; vertical-align: middle; opacity: .9; }
+
+  .score { top: 0; width: 82px; height: 80px; line-height: 80px; text-align: center; font-size: 66px;
+           letter-spacing: -2px; }
+  #homeScore { left: 140px; }
+  #awayScore { left: 338px; }
+  .score.flash { background: #fff; color: #000; }
+
+  #mid { left: 222px; top: 0; width: 116px; height: 80px; }
+  #period { position: absolute; left: 0; right: 0; top: 3px; height: 16px; line-height: 16px; font-size: 12px;
+            text-align: center; color: #9fe8ff; letter-spacing: 1px; white-space: nowrap; overflow: hidden; }
+  #clock { position: absolute; left: 0; right: 0; top: 22px; height: 54px; line-height: 54px; text-align: center;
+           color: #ffc400; font-size: 42px; white-space: nowrap; }
+  #clock span { display: inline-block; width: 23px; text-align: center; }
+  #clock span.c { width: 11px; position: relative; top: -3px; }
+  #clock.alert { color: #ff3b30; }
+  #clock.paused { opacity: .95; }
+
+  .div { top: 6px; width: 2px; height: 68px; background: #2a2a2a; }
+
+  #msg { left: 0; top: 0; width: 560px; height: 80px; background: #000; display: none; overflow: hidden; }
+  #msgText { position: absolute; top: 0; height: 80px; line-height: 80px; white-space: nowrap; font-size: 56px;
+             color: #ffc400; text-transform: uppercase; left: 0; }
+  #msgText.center { width: 560px; text-align: center; }
+  @-webkit-keyframes scroll { from { -webkit-transform: translateX(560px); } to { -webkit-transform: translateX(-100%); } }
+  @keyframes scroll { from { transform: translateX(560px); } to { transform: translateX(-100%); } }
+  #msgText.scroll { -webkit-animation: scroll linear infinite; animation: scroll linear infinite; }
+
+  #dot { right: 0; bottom: 0; width: 3px; height: 3px; background: #ff3b30; display: none; }
+</style>
+</head>
+<body>
+<div id="board">
+  <div id="homeTeam" class="abs team">
+    <div class="stripe" id="homeStripe"></div>
+    <div class="name" id="homeName">HOME</div>
+    <div class="flag" id="homeFlag"></div>
+  </div>
+  <div class="abs div" style="left:139px"></div>
+  <div id="homeScore" class="abs score">0</div>
+  <div class="abs div" style="left:221px"></div>
+  <div id="mid" class="abs">
+    <div id="period"></div>
+    <div id="clock"></div>
+  </div>
+  <div class="abs div" style="left:337px"></div>
+  <div id="awayScore" class="abs score">0</div>
+  <div class="abs div" style="left:419px"></div>
+  <div id="awayTeam" class="abs team">
+    <div class="stripe" id="awayStripe"></div>
+    <div class="name" id="awayName">AWAY</div>
+    <div class="flag" id="awayFlag"></div>
+  </div>
+  <div id="msg" class="abs"><div id="msgText"></div></div>
+  <div id="dot" class="abs"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt-min.js"></script>
+<script src="sync.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var code = LS.qs('code');
+  var KEY = 'ls_display_' + code;
+  var state = LS.store(KEY) || LS.defaultState();
+  var flags = LS.store(KEY + '_flags') || { home: null, away: null };
+  var last = {};
+
+  // ---- fit the 560x80 board to the window (exactly 1:1 on the TB60) ----
+  function fit() {
+    var b = $('board');
+    if (LS.qs('fit') === '0') return;
+    var w = window.innerWidth || document.documentElement.clientWidth;
+    var h = window.innerHeight || document.documentElement.clientHeight;
+    var s = Math.min(w / 560, h / 80);
+    if (!s || s <= 0) s = 1;
+    var t = 'scale(' + s + ')';
+    b.style.webkitTransform = t; b.style.transform = t;
+    b.style.left = Math.max(0, Math.floor((w - 560 * s) / 2)) + 'px';
+    b.style.top = Math.max(0, Math.floor((h - 80 * s) / 2)) + 'px';
+  }
+  window.onresize = fit;
+  fit();
+
+  function fitText(el, max, min) {
+    var size = max;
+    el.style.fontSize = size + 'px';
+    while (el.scrollWidth > el.clientWidth && size > min) { size--; el.style.fontSize = size + 'px'; }
+  }
+
+  function txt(el, s) { el.textContent !== undefined ? (el.textContent = s) : (el.innerText = s); }
+
+  function renderFlag(side) {
+    var box = $(side + 'Flag'), data = flags[side] && flags[side].data;
+    var key = 'flag_' + side + (data ? data.length + data.substr(-40) : 'none') + state[side].color;
+    if (last['flagkey_' + side] === key) return;
+    last['flagkey_' + side] = key;
+    box.innerHTML = '';
+    if (data) {
+      var img = document.createElement('img');
+      img.src = data;
+      box.appendChild(img);
+    } else {
+      var d = document.createElement('span');
+      d.className = 'noflag';
+      d.style.background = state[side].color;
+      box.appendChild(d);
+    }
+  }
+
+  var flashTimers = {};
+  function flash(side) {
+    var el = $(side + 'Score'), n = 0;
+    if (flashTimers[side]) clearInterval(flashTimers[side]);
+    flashTimers[side] = setInterval(function () {
+      n++;
+      if (n % 2) el.className = 'abs score flash'; else el.className = 'abs score';
+      if (n >= 8) { clearInterval(flashTimers[side]); el.className = 'abs score'; }
+    }, 220);
+  }
+
+  function renderTeams(allowFlash) {
+    var sides = ['home', 'away'];
+    for (var i = 0; i < 2; i++) {
+      var s = sides[i], t = state[s];
+      var nameEl = $(s + 'Name');
+      if (last[s + 'name'] !== t.name) { last[s + 'name'] = t.name; txt(nameEl, t.name || ''); fitText(nameEl, 22, 11); }
+      if (last[s + 'color'] !== t.color) { last[s + 'color'] = t.color; $(s + 'Stripe').style.background = t.color; }
+      var sc = String(t.score);
+      if (last[s + 'score'] !== sc) {
+        var prev = last[s + 'score'];
+        last[s + 'score'] = sc;
+        var el = $(s + 'Score');
+        txt(el, sc);
+        el.style.fontSize = (sc.length >= 3 ? 48 : 66) + 'px';
+        if (allowFlash && prev !== undefined && t.score > parseInt(prev, 10)) flash(s);
+      }
+      renderFlag(s);
+    }
+    var p = LS.PERIODS[state.period] !== undefined ? LS.PERIODS[state.period] : state.period;
+    if (last.period !== p) { last.period = p; txt($('period'), p); }
+  }
+
+  function renderMsg() {
+    var m = state.msg || {}, box = $('msg'), t = $('msgText');
+    var key = (m.on ? '1' : '0') + (m.text || '');
+    if (last.msg === key) return;
+    last.msg = key;
+    box.style.display = m.on && m.text ? 'block' : 'none';
+    if (!(m.on && m.text)) return;
+    txt(t, m.text);
+    t.className = '';
+    t.style.fontSize = '56px';
+    t.style.webkitAnimationDuration = t.style.animationDuration = '';
+    var size = 56;
+    while (t.offsetWidth > 548 && size > 30) { size -= 2; t.style.fontSize = size + 'px'; }
+    if (t.offsetWidth > 548) {
+      var dur = Math.max(6, (t.offsetWidth + 560) / 70); // ~70 px per second
+      t.style.webkitAnimationDuration = t.style.animationDuration = dur + 's';
+      t.className = 'scroll';
+    } else {
+      t.className = 'center';
+    }
+  }
+
+  function renderClock() {
+    var s = LS.fmt(LS.shown(state));
+    var cls = LS.alerting(state) ? 'alert' : (state.clock.running ? '' : 'paused');
+    if (last.clock !== s) {
+      last.clock = s;
+      var h = '';
+      for (var i = 0; i < s.length; i++) {
+        var ch = s.charAt(i);
+        h += ch === ':' ? '<span class="c">:</span>' : '<span>' + ch + '</span>';
+      }
+      $('clock').innerHTML = h;
+    }
+    if (last.clockCls !== cls) { last.clockCls = cls; $('clock').className = cls; }
+  }
+
+  function renderAll(allowFlash) { renderTeams(allowFlash); renderMsg(); renderClock(); }
+
+  renderAll();
+  setInterval(renderClock, 100);
+
+  if (!code) {
+    state.msg = { on: true, text: 'ADD ?code=YOUR-MATCH-CODE TO THE LINK' };
+    renderMsg();
+    return;
+  }
+
+  var link = new LS.Link(code, function (kind, data, retained) {
+    if (kind === 'state') {
+      if (!data.seq || data.seq <= state.seq) return;
+      state = data;
+      LS.store(KEY, state);
+      renderAll(!retained);
+    } else if (kind === 'flag/home' || kind === 'flag/away') {
+      var side = kind.substr(5);
+      if (flags[side] && data.seq <= flags[side].seq) return;
+      flags[side] = data;
+      LS.store(KEY + '_flags', flags);
+      renderFlag(side);
+    }
+  }, function (n) {
+    $('dot').style.display = n > 0 ? 'none' : 'block';
+  });
+})();
+</script>
+</body>
+</html>

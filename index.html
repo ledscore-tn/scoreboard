@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>Rugby Scoreboard Control</title>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #171b22; --panel2: #1f242d; --line: #2a303a;
+    --text: #e9edf2; --muted: #8b95a5; --accent: #ffc400; --go: #22c55e; --stop: #f59e0b; --danger: #ef4444;
+    --home: #1e88e5; --away: #e53935; --r: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  body { padding: 12px 12px calc(24px + env(safe-area-inset-bottom)); }
+  .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 12px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  h1 { font-size: 17px; margin: 0; letter-spacing: .3px; }
+  h1 small { color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .pill i { width: 9px; height: 9px; border-radius: 50%; background: var(--danger); display: inline-block; }
+  .pill.ok i { background: var(--go); } .pill.half i { background: var(--stop); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
+  .card h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 700; }
+  .preview { padding: 10px; }
+  .preview .frame { position: relative; width: 100%; aspect-ratio: 7 / 1; background: #000; border-radius: 8px; overflow: hidden;
+    border: 1px solid #000; box-shadow: 0 0 0 1px var(--line); }
+  .preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+  .preview p { margin: 8px 2px 0; font-size: 12px; color: var(--muted); }
+
+  button { font: inherit; font-weight: 700; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 11px; min-height: 46px; padding: 0 12px; cursor: pointer; touch-action: manipulation; user-select: none; }
+  button:active { transform: scale(.97); }
+  button.sel { background: var(--accent); color: #111; border-color: var(--accent); }
+  button.go { background: var(--go); color: #06200f; border-color: var(--go); }
+  button.stop { background: var(--stop); color: #231500; border-color: var(--stop); }
+  button.warn { color: var(--danger); }
+  button.armed { background: var(--danger); color: #fff; border-color: var(--danger); }
+  input[type=text], input[type=number] { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 10px; min-height: 44px; padding: 0 12px; width: 100%; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row > * { flex: 1 1 auto; }
+  .grid { display: grid; gap: 8px; }
+
+  /* clock */
+  .clockface { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .readout { font: 800 54px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--accent); letter-spacing: 1px;
+    font-variant-numeric: tabular-nums; }
+  .readout.alert { color: var(--danger); }
+  .readout small { display: block; font: 700 12px/1.4 system-ui, sans-serif; color: var(--muted); letter-spacing: 1.2px; margin-top: 4px; }
+  #startBtn { min-width: 150px; min-height: 64px; font-size: 20px; flex: 0 0 auto; }
+  .adj { grid-template-columns: repeat(4, 1fr); }
+  .periods { grid-template-columns: repeat(3, 1fr); }
+  .sub { font-size: 12px; color: var(--muted); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+  .setrow input { max-width: 120px; flex: 0 0 110px; text-align: center; }
+
+  /* teams */
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .team { border-top: 5px solid var(--c); }
+  .team .score { font: 800 64px/1 system-ui, sans-serif; text-align: center; margin: 10px 0 12px; font-variant-numeric: tabular-nums; }
+  .pts { grid-template-columns: 1fr 1fr; }
+  .pts button small { display: block; font-size: 11px; font-weight: 600; opacity: .7; }
+  .pts .big { background: color-mix(in srgb, var(--c) 30%, var(--panel2)); border-color: color-mix(in srgb, var(--c) 55%, var(--line)); }
+  .flagrow { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .thumb { width: 66px; height: 44px; border-radius: 6px; background: #000 center/contain no-repeat; border: 1px solid var(--line); flex: 0 0 auto; }
+  .flagrow label, .flagrow button { flex: 1; }
+  label.btn { display: flex; align-items: center; justify-content: center; font-weight: 700; background: var(--panel2);
+    border: 1px solid var(--line); border-radius: 11px; min-height: 46px; padding: 0 10px; cursor: pointer; text-align: center; }
+  label.btn input { display: none; }
+  .colorrow { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .colorrow input[type=color] { width: 46px; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding: 3px; flex: 0 0 auto; }
+  .colorrow span { color: var(--muted); font-size: 13px; }
+
+  .msgpresets { grid-template-columns: repeat(4, 1fr); margin-top: 8px; }
+  .tools { grid-template-columns: repeat(3, 1fr); }
+  code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .linkbox { word-break: break-all; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+  .hint b { color: var(--text); }
+  @media (max-width: 520px) {
+    .teams { gap: 8px; } .team { padding: 10px; }
+    .team .score { font-size: 54px; }
+    .readout { font-size: 46px; }
+    #startBtn { min-width: 0; flex: 1 1 100%; }
+    .msgpresets { grid-template-columns: repeat(2, 1fr); }
+    .tools { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Rugby Scoreboard <small>control</small></h1>
+    <span class="pill" id="net"><i></i><span id="netText">Connecting…</span></span>
+  </header>
+
+  <section class="card preview">
+    <div class="frame"><iframe id="preview" title="Live LED preview" tabindex="-1"></iframe></div>
+    <p>Live preview — this is exactly what the LED screen shows (received back from the server).</p>
+  </section>
+
+  <section class="card">
+    <h2>Match clock</h2>
+    <div class="clockface">
+      <div class="readout" id="readout">00:00<small id="readoutSub">1ST HALF · PAUSED</small></div>
+      <button id="startBtn" class="go">▶ Start</button>
+    </div>
+    <div class="grid adj">
+      <button data-adj="-60000">−1 min</button>
+      <button data-adj="-1000">−1 s</button>
+      <button data-adj="1000">+1 s</button>
+      <button data-adj="60000">+1 min</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="resetClock" class="warn">Reset clock</button>
+      <button id="secondHalf">Set 2nd half</button>
+    </div>
+    <div class="row setrow" style="margin-top:8px">
+      <input type="text" id="setTime" placeholder="mm:ss" inputmode="numeric" aria-label="Set clock time">
+      <button id="setTimeBtn">Set time</button>
+    </div>
+
+    <div class="sub">Period</div>
+    <div class="grid periods" id="periods">
+      <button data-p="1H">1st half</button>
+      <button data-p="HT">Half time</button>
+      <button data-p="2H">2nd half</button>
+      <button data-p="FT">Full time</button>
+      <button data-p="ET">Extra time</button>
+      <button data-p="">No label</button>
+    </div>
+
+    <div class="sub">Clock settings</div>
+    <div class="row">
+      <button data-mode="up">Count up</button>
+      <button data-mode="down">Count down</button>
+    </div>
+    <div class="row" style="margin-top:8px" id="halves">
+      <button data-half="40">40 min</button>
+      <button data-half="35">35</button>
+      <button data-half="30">30</button>
+      <button data-half="20">20</button>
+      <button data-half="7">7 (Sevens)</button>
+      <input type="number" id="halfCustom" min="1" max="99" placeholder="Other" aria-label="Half length in minutes" style="flex:0 0 90px">
+    </div>
+    <p class="hint">Half length decides when the clock turns <b style="color:var(--danger)">red</b> (40:00 in the 1st half, 80:00 in the 2nd) and where countdown starts.</p>
+  </section>
+
+  <section class="teams" id="teams"></section>
+
+  <section class="card">
+    <h2>Match tools</h2>
+    <div class="grid tools">
+      <button id="undo">↶ Undo last score</button>
+      <button id="resetScores" class="warn">Reset scores to 0–0</button>
+      <button id="newMatch" class="warn">New match (scores + clock)</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Full-screen message</h2>
+    <div class="row">
+      <input type="text" id="msgText" maxlength="80" placeholder="e.g. TRY!  or  WELCOME TO THE FINAL">
+      <button id="msgToggle" style="flex:0 0 120px">Show</button>
+    </div>
+    <div class="grid msgpresets">
+      <button data-msg="TRY!">TRY!</button>
+      <button data-msg="HALF TIME">HALF TIME</button>
+      <button data-msg="FULL TIME">FULL TIME</button>
+      <button data-msg="WELCOME">WELCOME</button>
+    </div>
+    <p class="hint">Covers the whole screen until you press Hide. Long text scrolls automatically.</p>
+  </section>
+
+  <section class="card">
+    <h2>LED screen link (TB60)</h2>
+    <div class="linkbox mono" id="displayUrl"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="copyUrl">Copy link</button>
+      <button id="openUrl">Open display</button>
+    </div>
+    <p class="hint">Put this link in ViPlex as a <b>Web page</b> media, window size <b>560 × 80</b>. Match code: <b class="mono" id="codeShow"></b> — keep the same code for every match, so the link in the TB60 never has to change.</p>
+    <div class="row" style="margin-top:10px">
+      <input type="text" id="codeInput" placeholder="Change match code" aria-label="Match code">
+      <button id="codeBtn" style="flex:0 0 140px">Use this code</button>
+    </div>
+    <p class="hint" id="wakeHint">Tip: keep this page open during the match. The screen stays awake on supported phones.</p>
+  </section>
+</div>
+
+<template id="teamTpl">
+  <div class="card team">
+    <h2></h2>
+    <input type="text" class="name" maxlength="20" aria-label="Team name">
+    <div class="score">0</div>
+    <div class="grid pts">
+      <button class="big" data-add="5">+5<small>Try</small></button>
+      <button class="big" data-add="2">+2<small>Conversion</small></button>
+      <button class="big" data-add="3">+3<small>Penalty</small></button>
+      <button class="big" data-add="3">+3<small>Drop goal</small></button>
+      <button data-add="1">+1</button>
+      <button data-add="-1">−1</button>
+    </div>
+    <div class="flagrow">
+      <div class="thumb"></div>
+      <label class="btn">Flag…<input type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>
+      <button class="rmflag">Remove</button>
+    </div>
+    <div class="colorrow">
+      <input type="color" aria-label="Team colour">
+      <span>Team colour (side stripe)</span>
+    </div>
+  </div>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt-min.js"></script>
+<script src="sync.js"></script>
+<script>
+(function () {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const now = () => Date.now();
+
+  // ---------- match code ----------
+  let code = (LS.qs('code') || LS.store('ls_ctrl_code') || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (!code) code = 'rugby-' + LS.rid(6);
+  LS.store('ls_ctrl_code', code);
+  {
+    const u = new URL(location.href); u.searchParams.set('code', code); history.replaceState(null, '', u);
+  }
+  const myId = LS.store('ls_ctrl_id') || LS.rid(8); LS.store('ls_ctrl_id', myId);
+  const KEY = 'ls_ctrl_' + code;
+
+  let state = LS.store(KEY) || LS.defaultState();
+  let flags = LS.store(KEY + '_flags') || { home: null, away: null };
+  let history_ = [];
+
+  // ---------- display link ----------
+  const dUrl = new URL('display.html', location.href);
+  dUrl.search = ''; dUrl.searchParams.set('code', code);
+  const brokerParam = LS.qs('broker'); if (brokerParam) dUrl.searchParams.set('broker', brokerParam);
+  const displayUrl = dUrl.toString();
+  $('#displayUrl').textContent = displayUrl;
+  $('#codeShow').textContent = code;
+  $('#preview').src = displayUrl;
+  $('#copyUrl').onclick = async () => {
+    try { await navigator.clipboard.writeText(displayUrl); flashBtn($('#copyUrl'), 'Copied ✓'); }
+    catch (e) { prompt('Copy this link:', displayUrl); }
+  };
+  $('#openUrl').onclick = () => window.open(displayUrl, '_blank');
+  $('#codeBtn').onclick = () => {
+    const c = $('#codeInput').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (!c) return;
+    const u = new URL(location.href); u.searchParams.set('code', c); location.href = u.toString();
+  };
+
+  function flashBtn(b, text) { const t = b.textContent; b.textContent = text; setTimeout(() => (b.textContent = t), 1400); }
+
+  // ---------- network ----------
+  const link = new LS.Link(code, (kind, data) => {
+    if (kind === 'state') {
+      if (!data.seq || data.seq <= state.seq) return;
+      state = data; save(); render();
+    } else if (kind === 'flag/home' || kind === 'flag/away') {
+      const side = kind.slice(5);
+      if (flags[side] && data.seq <= flags[side].seq) return;
+      flags[side] = data; LS.store(KEY + '_flags', flags); renderFlags();
+    }
+  }, (n, total) => {
+    const p = $('#net');
+    p.className = 'pill' + (n === total ? ' ok' : n > 0 ? ' half' : '');
+    $('#netText').textContent = n === total ? 'Online' : n > 0 ? `Online (${n}/${total} servers)` : 'Offline — reconnecting…';
+  });
+  // After (re)connecting, re-send what we have so the screen always gets the latest match.
+  link.onConnect = (i) => setTimeout(() => {
+    if (state.seq) link.send('state', state, true, i);
+    ['home', 'away'].forEach(s => { if (flags[s]) link.send('flag/' + s, flags[s], true, i); });
+  }, 2500);
+  setInterval(() => link.send('ping', { t: now(), src: myId }, false), 5000);
+
+  function save() { LS.store(KEY, state); }
+  function commit() {
+    const t = now();
+    state.seq = Math.max(t, (state.seq || 0) + 1);
+    state.t = t;
+    state.src = myId;
+    save();
+    link.send('state', state, true);
+    render();
+  }
+
+  // ---------- clock ----------
+  function cur() { return LS.elapsed(state); }   // elapsed ms
+  function setClock(ms, running) {
+    const c = state.clock;
+    c.ms = Math.max(0, Math.round(ms));
+    c.sentAt = now();
+    c.running = running;
+    state.src = myId; // sentAt is now on our clock
+  }
+  function recalc() {
+    const half = (state.halfMin || 40) * 60000;
+    state.clock.lengthMs = half;
+    if (state.clock.mode === 'down') state.clock.alertMs = 0;
+    else state.clock.alertMs = state.period === '1H' ? half : state.period === '2H' ? half * 2 : 0;
+  }
+  function toggleClock() {
+    const e = cur();
+    setClock(e, !state.clock.running);
+    commit();
+  }
+  $('#startBtn').onclick = toggleClock;
+  $$('[data-adj]').forEach(b => b.onclick = () => {
+    const d = +b.dataset.adj * (state.clock.mode === 'down' ? -1 : 1);
+    setClock(cur() + d, state.clock.running); commit();
+  });
+  $('#resetClock').onclick = armed($('#resetClock'), () => { setClock(0, false); commit(); });
+  $('#secondHalf').onclick = () => {
+    state.period = '2H'; recalc();
+    setClock(state.clock.mode === 'down' ? 0 : state.halfMin * 60000, false); commit();
+  };
+  function parseTime(s) {
+    s = s.trim(); if (!s) return null;
+    let m = 0, sec = 0;
+    if (s.includes(':')) { const p = s.split(':'); m = +p[0] || 0; sec = +p[1] || 0; }
+    else if (s.length > 2) { m = +s.slice(0, -2); sec = +s.slice(-2); }
+    else m = +s;
+    if (isNaN(m) || isNaN(sec)) return null;
+    return (m * 60 + sec) * 1000;
+  }
+  $('#setTimeBtn').onclick = () => {
+    const v = parseTime($('#setTime').value); if (v === null) return;
+    const e = state.clock.mode === 'down' ? state.clock.lengthMs - v : v;
+    setClock(e, state.clock.running); commit(); $('#setTime').value = '';
+  };
+  $$('#periods [data-p]').forEach(b => b.onclick = () => { state.period = b.dataset.p; recalc(); commit(); });
+  $$('[data-mode]').forEach(b => b.onclick = () => {
+    if (state.clock.mode === b.dataset.mode) return;
+    state.clock.mode = b.dataset.mode; recalc(); setClock(0, false); commit();
+  });
+  $$('[data-half]').forEach(b => b.onclick = () => { state.halfMin = +b.dataset.half; $('#halfCustom').value = ''; recalc(); commit(); });
+  $('#halfCustom').onchange = () => {
+    const v = parseInt($('#halfCustom').value, 10); if (!(v > 0 && v < 100)) return;
+    state.halfMin = v; recalc(); commit();
+  };
+
+  // ---------- teams ----------
+  const teamEls = {};
+  ['home', 'away'].forEach(side => {
+    const node = $('#teamTpl').content.firstElementChild.cloneNode(true);
+    $('h2', node).textContent = side === 'home' ? 'Left team' : 'Right team';
+    const name = $('.name', node);
+    let nameTimer;
+    name.oninput = () => {
+      state[side].name = name.value;
+      clearTimeout(nameTimer); nameTimer = setTimeout(commit, 350);
+    };
+    $$('[data-add]', node).forEach(b => b.onclick = () => addScore(side, +b.dataset.add));
+    $('input[type=file]', node).onchange = (ev) => { const f = ev.target.files[0]; if (f) loadFlag(side, f); ev.target.value = ''; };
+    $('.rmflag', node).onclick = () => setFlag(side, null);
+    const color = $('input[type=color]', node);
+    color.oninput = () => { state[side].color = color.value; node.style.setProperty('--c', color.value); clearTimeout(nameTimer); nameTimer = setTimeout(commit, 200); };
+    $('#teams').appendChild(node);
+    teamEls[side] = { node, name, color, score: $('.score', node), thumb: $('.thumb', node) };
+  });
+
+  function addScore(side, n) {
+    history_.push({ home: state.home.score, away: state.away.score });
+    if (history_.length > 100) history_.shift();
+    state[side].score = Math.max(0, state[side].score + n);
+    commit();
+  }
+  $('#undo').onclick = () => {
+    const h = history_.pop(); if (!h) return flashBtn($('#undo'), 'Nothing to undo');
+    state.home.score = h.home; state.away.score = h.away; commit();
+  };
+  $('#resetScores').onclick = armed($('#resetScores'), () => {
+    history_.push({ home: state.home.score, away: state.away.score });
+    state.home.score = 0; state.away.score = 0; commit();
+  });
+  $('#newMatch').onclick = armed($('#newMatch'), () => {
+    history_.push({ home: state.home.score, away: state.away.score });
+    state.home.score = 0; state.away.score = 0;
+    state.period = '1H'; state.msg = { on: false, text: state.msg.text || '' };
+    recalc(); setClock(0, false); commit();
+  });
+
+  // Flags: shrink the image so it travels fast and fits the 46 px high flag area
+  function loadFlag(side, file) {
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxW = 152, maxH = 92;
+        const s = Math.min(maxW / img.width, maxH / img.height, 1);
+        const w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, 0, 0, w, h);
+        let data = file.type === 'image/jpeg' ? cv.toDataURL('image/jpeg', 0.9) : cv.toDataURL('image/png');
+        if (data.length > 80000) data = cv.toDataURL('image/jpeg', 0.85);
+        setFlag(side, data);
+      };
+      img.onerror = () => alert('This image could not be read. Try a PNG or JPEG.');
+      img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  }
+  function setFlag(side, data) {
+    const t = now();
+    flags[side] = { seq: Math.max(t, ((flags[side] && flags[side].seq) || 0) + 1), t, src: myId, data };
+    LS.store(KEY + '_flags', flags);
+    link.send('flag/' + side, flags[side], true);
+    renderFlags();
+  }
+
+  // ---------- message ----------
+  $('#msgToggle').onclick = () => {
+    const text = $('#msgText').value.trim();
+    if (state.msg.on) state.msg = { on: false, text };
+    else { if (!text) return $('#msgText').focus(); state.msg = { on: true, text }; }
+    commit();
+  };
+  $$('[data-msg]').forEach(b => b.onclick = () => { $('#msgText').value = b.dataset.msg; state.msg = { on: true, text: b.dataset.msg }; commit(); });
+
+  // two-tap confirm for destructive buttons
+  function armed(btn, fn) {
+    let timer = null; const label = btn.textContent;
+    return () => {
+      if (timer) { clearTimeout(timer); timer = null; btn.classList.remove('armed'); btn.textContent = label; fn(); return; }
+      btn.classList.add('armed'); btn.textContent = 'Tap again to confirm';
+      timer = setTimeout(() => { timer = null; btn.classList.remove('armed'); btn.textContent = label; }, 3000);
+    };
+  }
+
+  // ---------- render ----------
+  function render() {
+    ['home', 'away'].forEach(side => {
+      const t = state[side], el = teamEls[side];
+      if (document.activeElement !== el.name) el.name.value = t.name;
+      if (document.activeElement !== el.color) el.color.value = t.color;
+      el.node.style.setProperty('--c', t.color);
+      el.score.textContent = t.score;
+    });
+    $$('#periods [data-p]').forEach(b => b.classList.toggle('sel', b.dataset.p === state.period));
+    $$('[data-mode]').forEach(b => b.classList.toggle('sel', b.dataset.mode === state.clock.mode));
+    let preset = false;
+    $$('[data-half]').forEach(b => { const on = +b.dataset.half === state.halfMin; b.classList.toggle('sel', on); preset = preset || on; });
+    if (!preset && document.activeElement !== $('#halfCustom')) $('#halfCustom').value = state.halfMin;
+    $('#secondHalf').textContent = state.clock.mode === 'down' ? 'Set 2nd half (restart countdown)' : `Set 2nd half (${state.halfMin}:00)`;
+    const mt = $('#msgToggle');
+    mt.textContent = state.msg.on ? 'Hide' : 'Show'; mt.classList.toggle('sel', state.msg.on);
+    if (state.msg.on && document.activeElement !== $('#msgText')) $('#msgText').value = state.msg.text;
+    renderFlags(); tick();
+  }
+  function renderFlags() {
+    ['home', 'away'].forEach(side => {
+      const d = flags[side] && flags[side].data;
+      teamEls[side].thumb.style.backgroundImage = d ? `url("${d}")` : 'none';
+    });
+  }
+  function tick() {
+    const c = state.clock;
+    if (c.running && c.mode === 'down' && LS.shown(state) <= 0 && state.src === myId) {
+      setClock(c.lengthMs, false); commit(); return;
+    }
+    const r = $('#readout');
+    r.firstChild.nodeValue = LS.fmt(LS.shown(state));
+    r.classList.toggle('alert', LS.alerting(state));
+    $('#readoutSub').textContent = (LS.PERIODS[state.period] || 'NO LABEL') + ' · ' + (c.running ? 'RUNNING' : 'PAUSED');
+    const b = $('#startBtn');
+    b.textContent = c.running ? '❚❚ Pause' : '▶ Start';
+    b.className = c.running ? 'stop' : 'go';
+  }
+  setInterval(tick, 200);
+
+  // Space = start / pause (when not typing)
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); toggleClock(); }
+  });
+
+  // Keep the phone screen awake while the control panel is open
+  let lock = null;
+  async function wake() {
+    try { if ('wakeLock' in navigator && !lock) { lock = await navigator.wakeLock.request('screen'); lock.onrelease = () => (lock = null); } } catch (e) {}
+  }
+  document.addEventListener('click', wake);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') wake(); });
+
+  recalc(); render();
+})();
+</script>
+</body>
+</html>
