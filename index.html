@@ -26,6 +26,11 @@
   .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
   .lang button { min-height: 34px; border: 0; border-radius: 0; padding: 0 14px; background: var(--panel); }
   .lang button.sel { background: var(--accent); color: #111; }
+  .lockbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px; font-weight: 600; }
+  .lockbar.mine { border-color: var(--go); background: color-mix(in srgb, var(--go) 14%, var(--panel)); }
+  .lockbar.other { border-color: var(--stop); background: color-mix(in srgb, var(--stop) 16%, var(--panel)); }
+  .lockbar button { flex: 0 0 auto; }
+  body.locked .wrap > section:not(.preview):not(#lockBar):not(#linkCard) { opacity: .4; pointer-events: none; filter: grayscale(.6); }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; }
   .card h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 700; }
   .preview { padding: 10px; }
@@ -103,6 +108,11 @@
       <span class="pill" id="net"><i></i><span id="netText">Connecting…</span></span>
     </div>
   </header>
+
+  <section class="card lockbar" id="lockBar">
+    <span id="lockText">No device is controlling this match yet.</span>
+    <button id="takeBtn" class="go">Control from this tab</button>
+  </section>
 
   <section class="card preview">
     <div class="frame"><iframe id="preview" title="Live LED preview" tabindex="-1"></iframe></div>
@@ -182,7 +192,7 @@
     <p class="hint" id="hMsg">Covers the whole screen until you press Hide. Long text scrolls automatically.</p>
   </section>
 
-  <section class="card">
+  <section class="card" id="linkCard">
     <h2>LED screen link (TB60)</h2>
     <div class="linkbox mono" id="displayUrl"></div>
     <div class="row" style="margin-top:8px">
@@ -246,7 +256,10 @@
     'Change match code':'Changer le code du match','e.g. TRY!  or  WELCOME TO THE FINAL':'ex. ESSAI !  ou  BIENVENUE À LA FINALE',
     'RUNNING':'EN COURS','PAUSED':'EN PAUSE','NO LABEL':'SANS TITRE','Online':'En ligne','Offline — reconnecting…':'Hors ligne — reconnexion…',
     'Tap again to confirm':'Appuyer encore pour confirmer','Copied ✓':'Copié ✓','Nothing to undo':'Rien à annuler',
-    'Set 2nd half (restart countdown)':'2e mi-temps (relancer)','Set 2nd half':'2e mi-temps','Connecting…':'Connexion…'
+    'Set 2nd half (restart countdown)':'2e mi-temps (relancer)','Set 2nd half':'2e mi-temps','Connecting…':'Connexion…',
+    '✓ This tab is controlling the match':'✓ Cet onglet contrôle le match','No device is controlling this match yet.':'Aucun appareil ne contrôle encore ce match.',
+    'Another tab or phone is controlling. Buttons are locked here.':'Un autre onglet ou téléphone contrôle. Boutons bloqués ici.',
+    'Control from this tab':'Contrôler depuis cet onglet','Take control here':'Prendre le contrôle ici'
   };
   const HINTS_FR = {
     hPrev: 'Aperçu en direct — exactement ce que l’écran LED affiche (reçu du serveur).',
@@ -285,6 +298,8 @@
     const u = new URL(location.href); u.searchParams.set('code', code); history.replaceState(null, '', u);
   }
   const myId = LS.store('ls_ctrl_id') || LS.rid(8); LS.store('ls_ctrl_id', myId);
+  const tabId = LS.rid(10); // unique for this tab only
+  const isOwner = () => state.owner === tabId;
   const KEY = 'ls_ctrl_' + code;
 
   let state = LS.store(KEY) || LS.defaultState();
@@ -329,13 +344,15 @@
   });
   // After (re)connecting, re-send what we have so the screen always gets the latest match.
   link.onConnect = (i) => setTimeout(() => {
+    if (!isOwner()) return;
     if (state.seq) link.send('state', state, true, i);
     ['home', 'away'].forEach(s => { if (flags[s]) link.send('flag/' + s, flags[s], true, i); });
   }, 2500);
-  setInterval(() => link.send('ping', { t: now(), src: myId }, false), 5000);
+  setInterval(() => { if (isOwner()) link.send('ping', { t: now(), src: myId }, false); }, 5000);
 
   function save() { LS.store(KEY, state); }
   function commit() {
+    if (!isOwner()) { state = LS.store(KEY) || state; render(); return; }
     const t = now();
     state.seq = Math.max(t, (state.seq || 0) + 1);
     state.t = t;
@@ -477,7 +494,8 @@
     commit();
   };
   $$('[data-msg]').forEach(b => b.onclick = () => { const m = t(b.dataset.msg); $('#msgText').value = m; state.msg = { on: true, text: m }; commit(); });
-  $$('[data-lang]').forEach(b => b.onclick = () => { state.lang = b.dataset.lang; applyLang(state.lang); commit(); });
+  $('#takeBtn').onclick = () => { state.owner = tabId; commit(); };
+  $$('[data-lang]').forEach(b => b.onclick = () => { if (!isOwner()) return; state.lang = b.dataset.lang; applyLang(state.lang); commit(); });
 
   // two-tap confirm for destructive buttons
   function armed(btn, fn) {
@@ -493,6 +511,12 @@
 
   // ---------- render ----------
   function render() {
+    const bar = $('#lockBar'), mine = isOwner(), none = !state.owner;
+    document.body.classList.toggle('locked', !mine);
+    bar.className = 'card lockbar ' + (mine ? 'mine' : none ? '' : 'other');
+    $('#lockText').textContent = t(mine ? '✓ This tab is controlling the match' : none ? 'No device is controlling this match yet.' : 'Another tab or phone is controlling. Buttons are locked here.');
+    $('#takeBtn').style.display = mine ? 'none' : '';
+    $('#takeBtn').textContent = t(none ? 'Control from this tab' : 'Take control here');
     ['home', 'away'].forEach(side => {
       const t = state[side], el = teamEls[side];
       if (document.activeElement !== el.name) el.name.value = t.name;
@@ -520,7 +544,7 @@
   }
   function tick() {
     const c = state.clock;
-    if (c.running && c.mode === 'down' && LS.shown(state) <= 0 && state.src === myId) {
+    if (c.running && c.mode === 'down' && LS.shown(state) <= 0 && isOwner()) {
       setClock(c.lengthMs, false); commit(); return;
     }
     const r = $('#readout');
@@ -535,7 +559,7 @@
 
   // Space = start / pause (when not typing)
   document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); toggleClock(); }
+    if (e.code === 'Space' && isOwner() && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); toggleClock(); }
   });
 
   // Keep the phone screen awake while the control panel is open
