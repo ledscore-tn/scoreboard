@@ -45,8 +45,9 @@ var LS = (function () {
 
   var PERIODS = { '1H': '1ST HALF', 'HT': 'HALF TIME', '2H': '2ND HALF', 'FT': 'FULL TIME', 'ET': 'EXTRA TIME', '': '' };
   var PERIODS_FR = { '1H': '1RE MI-TEMPS', 'HT': 'MI-TEMPS', '2H': '2E MI-TEMPS', 'FT': 'FIN DU MATCH', 'ET': 'PROLONGATIONS', '': '' };
+  var PERIODS_AR = { '1H': 'الشوط الأول', 'HT': 'استراحة', '2H': 'الشوط الثاني', 'FT': 'نهاية المباراة', 'ET': 'وقت إضافي', '': '' };
   function periodText(state) {
-    var t = state.lang === 'fr' ? PERIODS_FR : PERIODS;
+    var t = state.lang === 'fr' ? PERIODS_FR : state.lang === 'ar' ? PERIODS_AR : PERIODS;
     return t[state.period] !== undefined ? t[state.period] : state.period;
   }
 
@@ -160,7 +161,7 @@ var LS = (function () {
   };
 
   return {
-    qs: qs, store: store, rid: rid, defaultState: defaultState, PERIODS: PERIODS, PERIODS_FR: PERIODS_FR, periodText: periodText,
+    qs: qs, store: store, rid: rid, defaultState: defaultState, PERIODS: PERIODS, PERIODS_FR: PERIODS_FR, PERIODS_AR: PERIODS_AR, periodText: periodText,
     elapsed: elapsed, shown: shown, alerting: alerting, fmt: fmt, Link: Link, offsets: offsets
   };
 })();

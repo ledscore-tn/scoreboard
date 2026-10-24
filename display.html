@@ -6,7 +6,7 @@
 <title>Scoreboard Display</title>
 <style>
   html, body { margin: 0; padding: 0; background: #000; overflow: hidden; width: 100%; height: 100%; }
-  body { font-family: Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: bold; color: #fff;
+  body { font-family: Roboto, "Helvetica Neue", Arial, "Noto Sans Arabic", "Droid Arabic Naskh", Tahoma, sans-serif; font-weight: bold; color: #fff;
          -webkit-font-smoothing: antialiased; cursor: none; }
   #board { position: absolute; left: 0; top: 0; width: 560px; height: 80px; background: #000; overflow: hidden;
            -webkit-transform-origin: 0 0; transform-origin: 0 0; }
@@ -57,14 +57,14 @@
 <div id="board">
   <div id="homeTeam" class="abs team">
     <div class="stripe" id="homeStripe"></div>
-    <div class="name" id="homeName">HOME</div>
+    <div class="name" dir="auto" id="homeName">HOME</div>
     <div class="flag" id="homeFlag"></div>
   </div>
   <div class="abs div" style="left:139px"></div>
   <div id="homeScore" class="abs score">0</div>
   <div class="abs div" style="left:221px"></div>
   <div id="mid" class="abs">
-    <div id="period"></div>
+    <div id="period" dir="auto"></div>
     <div id="clock"></div>
   </div>
   <div class="abs div" style="left:337px"></div>
@@ -72,10 +72,10 @@
   <div class="abs div" style="left:419px"></div>
   <div id="awayTeam" class="abs team">
     <div class="stripe" id="awayStripe"></div>
-    <div class="name" id="awayName">AWAY</div>
+    <div class="name" dir="auto" id="awayName">AWAY</div>
     <div class="flag" id="awayFlag"></div>
   </div>
-  <div id="msg" class="abs"><div id="msgText"></div></div>
+  <div id="msg" class="abs"><div id="msgText" dir="auto"></div></div>
   <div id="dot" class="abs"></div>
 </div>
 
@@ -162,7 +162,7 @@
       renderFlag(s);
     }
     var p = LS.periodText(state);
-    if (last.period !== p) { last.period = p; txt($('period'), p); }
+    if (last.period !== p) { last.period = p; txt($('period'), p); $('period').style.fontSize = state.lang === 'ar' ? '14px' : '12px'; }
   }
 
   function renderMsg() {

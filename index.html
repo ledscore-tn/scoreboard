@@ -56,6 +56,8 @@
 
   /* clock */
   .clockface { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .readout, .preview .frame, .linkbox, .setrow input, .teams { direction: ltr; }
+  [dir=rtl] .team { direction: rtl; }
   .readout { font: 800 54px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--accent); letter-spacing: 1px;
     font-variant-numeric: tabular-nums; }
   .readout.alert { color: var(--danger); }
@@ -104,7 +106,7 @@
   <header>
     <h1>Rugby Scoreboard <small>control</small></h1>
     <div class="row" style="flex:0 0 auto;gap:8px">
-      <div class="lang" role="group" aria-label="Language"><button data-lang="en">EN</button><button data-lang="fr">FR</button></div>
+      <div class="lang" role="group" aria-label="Language"><button data-lang="en">EN</button><button data-lang="fr">FR</button><button data-lang="ar">ع</button></div>
       <span class="pill" id="net"><i></i><span id="netText">Connecting…</span></span>
     </div>
   </header>
@@ -180,7 +182,7 @@
   <section class="card">
     <h2>Full-screen message</h2>
     <div class="row">
-      <input type="text" id="msgText" maxlength="80" placeholder="e.g. TRY!  or  WELCOME TO THE FINAL">
+      <input type="text" dir="auto" id="msgText" maxlength="80" placeholder="e.g. TRY!  or  WELCOME TO THE FINAL">
       <button id="msgToggle" style="flex:0 0 120px">Show</button>
     </div>
     <div class="grid msgpresets">
@@ -211,7 +213,7 @@
 <template id="teamTpl">
   <div class="card team">
     <h2></h2>
-    <input type="text" class="name" maxlength="20" aria-label="Team name">
+    <input type="text" dir="auto" class="name" maxlength="20" aria-label="Team name">
     <div class="score">0</div>
     <div class="grid pts">
       <button class="big" data-add="5">+5<small>Try</small></button>
@@ -261,6 +263,31 @@
     'Another tab or phone is controlling. Buttons are locked here.':'Un autre onglet ou téléphone contrôle. Boutons bloqués ici.',
     'Control from this tab':'Contrôler depuis cet onglet','Take control here':'Prendre le contrôle ici'
   };
+  const AR = {
+    'control':'التحكم','Match clock':'ساعة المباراة','▶ Start':'▶ ابدأ','❚❚ Pause':'❚❚ إيقاف','Reset clock':'تصفير الساعة','Set time':'ضبط الوقت',
+    'Period':'الفترة','1st half':'الشوط الأول','Half time':'استراحة','2nd half':'الشوط الثاني','Full time':'نهاية المباراة','Extra time':'وقت إضافي',
+    'No label':'بدون','Clock settings':'إعدادات الساعة','Count up':'تصاعدي','Count down':'تنازلي','40 min':'40 د','7 (Sevens)':'7 (السباعي)','Other':'أخرى',
+    '−1 min':'−1 د','+1 min':'+1 د','−1 s':'−1 ث','+1 s':'+1 ث',
+    'Left team':'الفريق الأيسر','Right team':'الفريق الأيمن','Try':'محاولة','Conversion':'تحويل','Penalty':'ركلة جزاء','Drop goal':'ركلة إسقاط',
+    'Flag…':'العلم…','Remove':'حذف','Team colour (side stripe)':'لون الفريق (الشريط)','Match tools':'أدوات المباراة','↶ Undo last score':'↶ إلغاء آخر نقطة',
+    'Reset scores to 0–0':'النتيجة 0–0','New match (scores + clock)':'مباراة جديدة (النتيجة + الساعة)','Full-screen message':'رسالة على كامل الشاشة',
+    'Show':'إظهار','Hide':'إخفاء','TRY!':'محاولة!','HALF TIME':'استراحة','FULL TIME':'نهاية المباراة','WELCOME':'مرحبا',
+    'LED screen link (TB60)':'رابط شاشة LED (TB60)','Copy link':'نسخ الرابط','Open display':'فتح الشاشة','Use this code':'استعمال هذا الرمز',
+    'Change match code':'تغيير رمز المباراة','e.g. TRY!  or  WELCOME TO THE FINAL':'مثال: محاولة!  أو  مرحبا بكم في النهائي',
+    'RUNNING':'يعمل','PAUSED':'متوقف','NO LABEL':'بدون عنوان','Online':'متصل','Offline — reconnecting…':'غير متصل — إعادة الاتصال…',
+    'Tap again to confirm':'اضغط مرة أخرى للتأكيد','Copied ✓':'تم النسخ ✓','Nothing to undo':'لا شيء للإلغاء',
+    'Set 2nd half (restart countdown)':'الشوط الثاني (إعادة العد)','Set 2nd half':'الشوط الثاني','Connecting…':'جار الاتصال…',
+    '✓ This tab is controlling the match':'✓ هذه الصفحة تتحكم في المباراة','No device is controlling this match yet.':'لا يوجد جهاز يتحكم في المباراة بعد.',
+    'Another tab or phone is controlling. Buttons are locked here.':'جهاز آخر يتحكم. الأزرار مقفلة هنا.',
+    'Control from this tab':'التحكم من هذه الصفحة','Take control here':'خذ التحكم هنا'
+  };
+  const HINTS_AR = {
+    hPrev: 'معاينة مباشرة — بالضبط ما تعرضه شاشة LED.',
+    hHalf: 'مدة الشوط تحدد متى تصبح الساعة <b style="color:var(--danger)">حمراء</b> (40:00 في الشوط الأول و80:00 في الثاني) ومن أين يبدأ العد التنازلي.',
+    hMsg: 'تغطي الشاشة كاملة حتى تضغط « إخفاء ». النص الطويل يتحرك تلقائيا.',
+    hLink: 'ضع هذا الرابط في ViPlex كوسيط <b>صفحة ويب</b>، بحجم <b>560 × 80</b>. رمز المباراة: <b class="mono" id="codeShow"></b> — احتفظ بنفس الرمز، رابط TB60 لا يتغير.',
+    hWake: 'نصيحة: اترك هذه الصفحة مفتوحة أثناء المباراة.'
+  };
   const HINTS_FR = {
     hPrev: 'Aperçu en direct — exactement ce que l’écran LED affiche (reçu du serveur).',
     hHalf: 'La durée de la mi-temps décide quand le chrono devient <b style="color:var(--danger)">rouge</b> (40:00 en 1re mi-temps, 80:00 en 2e) et où démarre le compte à rebours.',
@@ -269,10 +296,11 @@
     hWake: 'Astuce : gardez cette page ouverte pendant le match. L’écran reste allumé sur les téléphones compatibles.'
   };
   let uiLang = 'en';
-  const t = (en) => (uiLang === 'fr' && FR[en]) ? FR[en] : en;
+  const t = (en) => { const d = uiLang === 'fr' ? FR : uiLang === 'ar' ? AR : null; return (d && d[en]) ? d[en] : en; };
   function applyLang(l) {
-    uiLang = l === 'fr' ? 'fr' : 'en';
+    uiLang = (l === 'fr' || l === 'ar') ? l : 'en';
     document.documentElement.lang = uiLang;
+    document.documentElement.dir = uiLang === 'ar' ? 'rtl' : 'ltr';
     $$('button, h2, .sub, label.btn, small, .colorrow span, h1 small, #netText').forEach(el => {
       if (el.querySelector('*:not(input)') && el.tagName !== 'LABEL') return;
       const node = Array.from(el.childNodes).find(n => n.nodeType === 3 && n.nodeValue.trim());
@@ -284,7 +312,7 @@
     Object.keys(HINTS_FR).forEach(id => {
       const el = document.getElementById(id); if (!el) return;
       if (el.dataset.enh === undefined) el.dataset.enh = el.innerHTML;
-      el.innerHTML = uiLang === 'fr' ? HINTS_FR[id] : el.dataset.enh;
+      el.innerHTML = uiLang === 'fr' ? HINTS_FR[id] : uiLang === 'ar' ? HINTS_AR[id] : el.dataset.enh;
     });
     const cs = document.getElementById('codeShow'); if (cs) cs.textContent = code;
     $$('[data-lang]').forEach(b => b.classList.toggle('sel', b.dataset.lang === uiLang));
